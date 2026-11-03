@@ -1,0 +1,53 @@
+name: 每日学习提醒
+
+on:
+  schedule:
+    # UTC 01:00 = 北京时间 09:00
+    # 注意：GitHub 的 cron 用 UTC，且触发通常有几分钟到十几分钟延迟
+    - cron: '0 1 * * *'
+  workflow_dispatch:      # 支持手动触发，方便调试与补发
+    inputs:
+      date:
+        description: '指定日期 YYYY-MM-DD（留空=今天）'
+        required: false
+        default: ''
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 只有标准库依赖，无需 pip install
+      - name: 打印要发的内容（不发送）
+        env:
+          # schedule 触发时 inputs 为空，用 || 兜底成空串
+          TARGET_DATE: ${{ github.event.inputs.date || '' }}
+        run: |
+          if [ -n "$TARGET_DATE" ]; then
+            python3 remind.py --dry-run --date "$TARGET_DATE"
+          else
+            python3 remind.py --dry-run
+          fi
+
+      - name: 推送到飞书（应用私聊）
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_RECEIVE_ID: ${{ secrets.FEISHU_RECEIVE_ID }}
+          FEISHU_RECEIVE_ID_TYPE: union_id
+          TARGET_DATE: ${{ github.event.inputs.date || '' }}
+        run: |
+          if [ -n "$TARGET_DATE" ]; then
+            python3 remind.py --date "$TARGET_DATE"
+          else
+            python3 remind.py
+          fi

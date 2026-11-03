@@ -1,0 +1,727 @@
+{
+  "meta": {
+    "bot_name": "进度条",
+    "start_date": "2026-11-09",
+    "total_weeks": 24,
+    "daily_minutes": "工作日 45–60 分钟，周末 3–4 小时",
+    "keyword": "进度条"
+  },
+  "pre_phase": {
+    "title": "预备期：把环境跑起来",
+    "goal": "用 5 天搭好实验环境，后面 24 周所有学习都在这个环境里验证。环境不通，计划必崩。",
+    "days": [
+      {
+        "date": "2026-11-04",
+        "tasks": [
+          "装 Docker Desktop，确认 docker compose version 可用",
+          "建目录 ~/datalab，写 docker-compose.yml 骨架（MinIO + Spark + Kafka + Doris 先留空位）",
+          "先只起 MinIO，用 mc 建 warehouse bucket 并验证读写"
+        ]
+      },
+      {
+        "date": "2026-11-05",
+        "tasks": [
+          "起 spark-iceberg 容器，用 spark-sql 建一张 Iceberg 表并 insert 两条数据",
+          "验证 SELECT 能查到数据，确认 warehouse 真的落在 MinIO 上",
+          "把整套启动命令写进 ~/datalab/README.md"
+        ]
+      },
+      {
+        "date": "2026-11-06",
+        "tasks": [
+          "起 Kafka（KRaft 模式，不用 ZooKeeper）+ Doris FE/BE",
+          "用 kafka-console-producer 灌 10 条消息，consumer 读出来",
+          "Doris 里建一张 Duplicate 模型表，导入一行数据并查询"
+        ]
+      },
+      {
+        "date": "2026-11-07",
+        "tasks": [
+          "通读 Maxime Beauchemin《Functional Data Engineering》（约 30 分钟）",
+          "写下你对「幂等 + 分区是不可变数据」的理解，50 字即可",
+          "确认 docker compose up -d 一条命令能拉起全部组件"
+        ]
+      },
+      {
+        "date": "2026-11-08",
+        "tasks": [
+          "补齐环境缺口，给每个组件记录端口和进入方式",
+          "建一个 git repo 管理 ~/datalab，完成首次提交",
+          "预习第 1 周主题：列存为什么快"
+        ]
+      }
+    ],
+    "materials": [
+      {
+        "name": "Functional Data Engineering（必读，30 分钟）",
+        "url": "https://maximebeauchemin.medium.com/functional-data-engineering-a-modern-paradigm-for-batch-data-processing-2327ec32c42a"
+      },
+      {
+        "name": "Iceberg Spark Quickstart（Docker 一键起环境）",
+        "url": "https://iceberg.apache.org/spark-quickstart/"
+      },
+      {
+        "name": "Doris Docker 部署",
+        "url": "https://doris.apache.org/docs/install/cluster-deployment/run-docker-cluster"
+      },
+      {
+        "name": "Kafka Quickstart（KRaft）",
+        "url": "https://kafka.apache.org/quickstart"
+      }
+    ]
+  },
+  "weeks": [
+    {
+      "week": 1,
+      "phase": "A 存储与计算",
+      "title": "列存格式与对象存储语义",
+      "goal": "搞懂 Parquet/ORC 为什么快，以及对象存储不能 rename 如何反推 ETL 设计。",
+      "materials": [
+        {
+          "name": "Parquet 官方格式说明",
+          "url": "https://parquet.apache.org/docs/file-format/"
+        },
+        {
+          "name": "ORC 规范",
+          "url": "https://orc.apache.org/specification/"
+        },
+        {
+          "name": "S3 一致性模型",
+          "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html#ConsistencyModel"
+        }
+      ],
+      "weekday": [
+        "读 Parquet 格式：row group、column chunk、footer 元数据分别存什么",
+        "搞懂字典编码 / RLE / 谓词下推，用 spark-sql 对一个 parquet 表 explain 看 pushdown",
+        "对比 parquet vs orc vs avro 的适用场景，写 5 行结论进笔记",
+        "理解对象存储：没有真正 rename、List 是慢操作、最终一致的历史坑",
+        "推导：为什么 Spark 写 S3 会产生 _temporary 目录、为什么小文件很贵"
+      ],
+      "weekend": {
+        "sat": "实验：同一份 100 万行数据分别存 parquet(zstd) 和 csv，比较体积与扫描耗时，记录数字",
+        "sun": "实验：把压缩从 snappy 换 zstd，看文件大小和读取耗时变化；写 200 字总结"
+      }
+    },
+    {
+      "week": 2,
+      "phase": "A 存储与计算",
+      "title": "Iceberg 表格式（本阶段重点）",
+      "goal": "能解释 Iceberg 的四层元数据结构，并说清时间旅行和 schema evolution 的实现原理。",
+      "materials": [
+        {
+          "name": "Iceberg 官方 Spec（必读原文，慢读）",
+          "url": "https://iceberg.apache.org/spec/"
+        },
+        {
+          "name": "Iceberg 文档首页",
+          "url": "https://iceberg.apache.org/docs/latest/"
+        }
+      ],
+      "weekday": [
+        "读 spec：metadata file → manifest list → manifest file → data file 四层关系",
+        "理解快照 snapshot 与乐观并发提交，写清「两个人同时写会怎样」",
+        "隐藏分区 hidden partitioning：为什么按天分区不用建 day 字段",
+        "schema evolution：为什么删列不重写数据、加列不用改历史文件",
+        "时间旅行 + 增量读（incremental read）语义与适用场景"
+      ],
+      "weekend": {
+        "sat": "实验：建分区表 → 写入两批 → VERSION AS OF 查历史 → ALTER TABLE 删列后仍能读老数据",
+        "sun": "实验：制造 100 个小文件，用 rewrite_data_files 合并；对比合并前后扫描耗时"
+      }
+    },
+    {
+      "week": 3,
+      "phase": "A 存储与计算",
+      "title": "Spark 执行模型与 Catalyst",
+      "goal": "从「会写 DataFrame」升级到「看得懂执行计划」。",
+      "materials": [
+        {
+          "name": "Spark SQL Performance Tuning",
+          "url": "https://spark.apache.org/docs/latest/sql-performance-tuning.html"
+        },
+        {
+          "name": "EXPLAIN 语法与计划解读",
+          "url": "https://spark.apache.org/docs/latest/sql-ref-syntax-qry-explain.html"
+        }
+      ],
+      "weekday": [
+        "搞清 RDD / DataFrame / Dataset 的关系，以及为什么现在只用 DataFrame API",
+        "读一条 SQL 的 parsed → analyzed → optimized → physical 四个计划",
+        "认识常见算子与代价：join、aggregate、sort、distinct",
+        "Catalyst 规则：谓词下推、列裁剪、常量折叠、join 重排序",
+        "练习：用 explain(true) 读懂一个 3 表 join 的物理计划"
+      ],
+      "weekend": {
+        "sat": "实验：写 3 条等价 SQL，比较执行计划差异，找出最优写法和原因",
+        "sun": "整理一张「算子 → 是否 shuffle → 代价」速查表，贴到笔记里"
+      }
+    },
+    {
+      "week": 4,
+      "phase": "A 存储与计算",
+      "title": "shuffle 与数据倾斜",
+      "goal": "shuffle 是所有性能问题的根源，倾斜是最常见的失败原因。",
+      "materials": [
+        {
+          "name": "Spark Tuning Guide",
+          "url": "https://spark.apache.org/docs/latest/tuning.html"
+        },
+        {
+          "name": "AQE 与 skew join",
+          "url": "https://spark.apache.org/docs/latest/sql-performance-tuning.html#adaptive-query-execution"
+        }
+      ],
+      "weekday": [
+        "搞懂宽依赖/窄依赖、stage 如何切分、shuffle write 与 read 各做什么",
+        "看 Spark UI 的 Stage 页：Shuffle Read/Write Size、Spill 意味着什么",
+        "倾斜的 5 种解法：加盐、两阶段聚合、广播小表、拆分热点 key、AQE skew join",
+        "搞清楚 broadcast join 的阈值与 OOM 风险（广播大表会炸 executor）",
+        "练习：人为造一个热点 key，观察任务长尾，再用加盐解决"
+      ],
+      "weekend": {
+        "sat": "实验：10 万行小表 join 1 亿行大表，分别用 broadcast 和 sort-merge，对比耗时",
+        "sun": "把倾斜实验的前后对比、截图、结论整理成一页笔记（面试可直接讲）"
+      }
+    },
+    {
+      "week": 5,
+      "phase": "A 存储与计算",
+      "title": "Spark 调优与小文件治理",
+      "goal": "把「跑 4 小时」优化到「40 分钟」，并说清每一处改动的原因。",
+      "materials": [
+        {
+          "name": "Spark 配置项全表（按需查）",
+          "url": "https://spark.apache.org/docs/latest/configuration.html"
+        },
+        {
+          "name": "AQE 官方说明",
+          "url": "https://spark.apache.org/docs/latest/sql-performance-tuning.html#adaptive-query-execution"
+        }
+      ],
+      "weekday": [
+        "内存模型：executor memory 分区、execution vs storage、什么时候 spill",
+        "GC 问题识别：GC time 占比、序列化方式（Kryo vs Java）的影响",
+        "并行度：spark.sql.shuffle.partitions 怎么定、为什么默认 200 常常是错的",
+        "小文件：产生原因、对查询的影响、合并策略（写入前 repartition / 定期 compaction）",
+        "AQE 三个能力：合并 shuffle 分区、切换 join 策略、处理倾斜"
+      ],
+      "weekend": {
+        "sat": "实战：挑一个自己写的慢任务做完整调优，记录「原始耗时 / 瓶颈判断 / 改动 / 结果」四列表",
+        "sun": "复盘：把调优过程写成 300 字，逼自己说清每次改动的因果"
+      }
+    },
+    {
+      "week": 6,
+      "phase": "A 存储与计算",
+      "title": "Structured Streaming 与阶段复盘",
+      "goal": "掌握微批语义与幂等写入，这是后面实时链路的基础。",
+      "materials": [
+        {
+          "name": "Structured Streaming 编程指南",
+          "url": "https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html"
+        }
+      ],
+      "weekday": [
+        "微批执行模型：trigger、processing time vs event time",
+        "watermark 解决什么问题，迟到数据怎么处理",
+        "checkpoint 存了什么，为什么换目录会导致重复消费",
+        "foreachBatch 做幂等写入（MERGE INTO / 按分区覆盖）",
+        "阶段 A 复盘：把 6 周笔记串成「存储格式 → 表格式 → 计算 → 调优」一条主线"
+      ],
+      "weekend": {
+        "sat": "实验：Kafka → Structured Streaming → Iceberg 端到端跑通，中途 kill 再重启，验证不重不漏",
+        "sun": "阶段 A 自测：不看笔记，口述 Iceberg 四层元数据 + 倾斜 5 种解法 + 小文件治理方案"
+      }
+    },
+    {
+      "week": 7,
+      "phase": "B 数据集成",
+      "title": "CDC 原理与 Debezium 上手",
+      "goal": "理解「全量 + 增量无缝切换」为什么是数据集成里最难的工程问题。",
+      "materials": [
+        {
+          "name": "Debezium 文档",
+          "url": "https://debezium.io/documentation/"
+        },
+        {
+          "name": "Flink CDC 文档",
+          "url": "https://nightlies.apache.org/flink/flink-cdc-docs-stable/"
+        },
+        {
+          "name": "MySQL binlog 格式",
+          "url": "https://dev.mysql.com/doc/refman/8.0/en/binary-log-formats.html"
+        }
+      ],
+      "weekday": [
+        "binlog 三种格式（statement/row/mixed），为什么 CDC 必须用 row",
+        "一条 UPDATE 在 binlog 里的样子：before/after image 与 op 字段",
+        "快照阶段与增量阶段如何衔接：位点一致性、加锁策略、大表不停机方案",
+        "DDL 变更怎么同步，为什么它是 CDC 的最大痛点",
+        "乱序、重复、事务边界：at-least-once 从哪里来"
+      ],
+      "weekend": {
+        "sat": "实验：MySQL(开 binlog) + Debezium + Kafka，做 insert/update/delete，看消息体结构",
+        "sun": "实验：跑一次全量快照 + 增量，过程中改表结构，记录哪里出错、怎么绕"
+      }
+    },
+    {
+      "week": 8,
+      "phase": "B 数据集成",
+      "title": "Kafka 核心机制",
+      "goal": "能解释 rebalance、ISR、消费位点，以及「精确一次」的真实代价。",
+      "materials": [
+        {
+          "name": "Kafka 官方文档（Design 章节）",
+          "url": "https://kafka.apache.org/documentation/#design"
+        }
+      ],
+      "weekday": [
+        "分区与副本：leader/follower、ISR、acks=0/1/all 的可靠性差异",
+        "消费位点与提交：自动提交会丢数据吗、手动提交的时机",
+        "rebalance 的触发条件与代价，如何减少（static membership、增量协作）",
+        "生产者幂等 + 事务：exactly-once 在 Kafka 内部成立，跨系统不成立",
+        "消息顺序性：单分区有序，多分区怎么办（按 key 分区）"
+      ],
+      "weekend": {
+        "sat": "实验：3 分区 topic，用不同 key 生产消息，验证同 key 落同分区；模拟 consumer 崩溃看重复消费",
+        "sun": "写一份「Kafka 在数据平台里的 5 个常见坑」清单（含 lag 堆积、分区不均、消息过大）"
+      }
+    },
+    {
+      "week": 9,
+      "phase": "B 数据集成",
+      "title": "端到端一致性：幂等、去重与对账",
+      "goal": "数据平台的核心承诺是「不重不漏」，这一周把它变成可验证的能力。",
+      "materials": [
+        {
+          "name": "Iceberg Spark Writes（MERGE INTO）",
+          "url": "https://iceberg.apache.org/docs/latest/spark-writes/"
+        },
+        {
+          "name": "Kafka 消息投递语义",
+          "url": "https://kafka.apache.org/documentation/#semantics"
+        }
+      ],
+      "weekday": [
+        "幂等的三种实现：主键 upsert、按分区覆盖（overwrite）、版本号去重",
+        "MERGE INTO 的成本：为什么要 join，大表 merge 怎么优化",
+        "去重的边界：同一条数据多次变更，如何只保留最新",
+        "对账设计：总量对账、主键集合对账、抽样明细对账，各自能发现什么",
+        "脏数据处理：解析失败、字段缺失、类型不符，是丢、是留、还是进死信队列"
+      ],
+      "weekend": {
+        "sat": "实战：MySQL 改一条数据 → 30 秒内 Iceberg 可查 → 重启任务验证不重不漏 → 跑一次对账脚本",
+        "sun": "阶段 B 复盘：画出完整数据流，标出每个可能丢/重的点及防护措施"
+      }
+    },
+    {
+      "week": 10,
+      "phase": "C OLAP 与建模落地",
+      "title": "OLAP 分类选型与 Doris 架构",
+      "goal": "建立选型框架，而不是背引擎名字。",
+      "materials": [
+        {
+          "name": "Doris 官方文档",
+          "url": "https://doris.apache.org/docs/"
+        },
+        {
+          "name": "StarRocks 特性总览",
+          "url": "https://docs.starrocks.io/docs/introduction/Features/"
+        },
+        {
+          "name": "ClickHouse 建表指南",
+          "url": "https://clickhouse.com/docs/en/guides/creating-tables"
+        }
+      ],
+      "weekday": [
+        "四类 OLAP：MPP 数据库、预计算（Kylin/Druid）、湖上查询（Trino）、云数仓，各自边界",
+        "Doris 架构：FE（元数据/查询规划）+ BE（存储/执行），为什么无外部依赖",
+        "三种数据模型：Duplicate / Aggregate / Unique，各自适用场景",
+        "MPP vs 单机并行 vs 预计算的延迟与成本对比",
+        "选型练习：高并发点查 / 大宽表聚合 / 实时写入 / 多表 join 分别选谁"
+      ],
+      "weekend": {
+        "sat": "实验：Doris 建三种模型各一张表，同一份数据导入，对比查询结果与存储",
+        "sun": "写一页选型决策表：场景 → 引擎 → 理由 → 风险"
+      }
+    },
+    {
+      "week": 11,
+      "phase": "C OLAP 与建模落地",
+      "title": "Doris 表设计：分区、分桶与索引",
+      "goal": "同一份数据，表设计不同，查询性能差 100 倍。",
+      "materials": [
+        {
+          "name": "Doris 表设计总览",
+          "url": "https://doris.apache.org/docs/table-design/overview"
+        },
+        {
+          "name": "Doris 索引总览",
+          "url": "https://doris.apache.org/docs/table-design/index/overview"
+        }
+      ],
+      "weekday": [
+        "分区（Partition）：按时间 range 分区，分区裁剪怎么生效",
+        "分桶（Bucket）：hash 分桶的意义、桶数怎么定、桶太少会怎样",
+        "前缀索引：为什么 key 列顺序决定索引命中，最左前缀原则",
+        "跳数索引 / BloomFilter / 倒排索引：分别加速什么类型的过滤",
+        "物化视图与 Rollup：预聚合的收益与维护成本（写入放大）"
+      ],
+      "weekend": {
+        "sat": "实验：同一份 1000 万行数据建两张表（分区合理 vs 全表扫描），对比查询耗时",
+        "sun": "实验：建一个物化视图，对比命中前后的查询耗时与导入耗时变化"
+      }
+    },
+    {
+      "week": 12,
+      "phase": "C OLAP 与建模落地",
+      "title": "查询优化实战",
+      "goal": "给出 2 种表设计并说清在写入成本、查询延迟、存储放大上的取舍。",
+      "materials": [
+        {
+          "name": "Doris 查询优化",
+          "url": "https://doris.apache.org/docs/query-optimization/overview"
+        },
+        {
+          "name": "ClickHouse 查询优化",
+          "url": "https://clickhouse.com/docs/en/optimize/query-optimization"
+        }
+      ],
+      "weekday": [
+        "用 profile / explain 定位：卡在扫描、join、聚合还是网络传输",
+        "Colocate Join / Runtime Filter：Doris 的两个关键优化能力，什么时候生效",
+        "大表 join 小表 vs 大表 join 大表，分别怎么设计",
+        "count(distinct) 的代价与近似替代（bitmap / HLL）",
+        "高并发点查场景：为什么宽表 + 前缀索引比 join 好"
+      ],
+      "weekend": {
+        "sat": "实战：给一个「10 亿行明细秒级聚合」的需求，给出两套表设计并压测对比",
+        "sun": "整理成一份表设计评审模板（含数据量、查询模式、SLA、成本四项）"
+      }
+    },
+    {
+      "week": 13,
+      "phase": "C OLAP 与建模落地",
+      "title": "维度建模真正落地：ODS→DWD→DWS→ADS",
+      "goal": "把已经会的建模理论，变成能上线、能演进、有口径文档的东西。",
+      "materials": [
+        {
+          "name": "Kimball 维度建模技术索引",
+          "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
+        },
+        {
+          "name": "阿里 OneData 建模体系",
+          "url": "https://help.aliyun.com/zh/maxcompute/user-guide/onendata-modeling"
+        }
+      ],
+      "weekday": [
+        "分层职责边界：ODS 只做同步不改数据，DWD 做清洗与规范化，DWS 做轻度汇总",
+        "粒度声明：每张表必须在文档里写清「一行代表什么」",
+        "缓慢变化维 SCD2 的落地：拉链表怎么建、怎么查最新",
+        "指标体系：原子指标 / 派生指标 / 复合指标，口径冲突怎么治理",
+        "ADS 宽表打平策略：什么时候拼宽、什么时候保留 join"
+      ],
+      "weekend": {
+        "sat": "实战：选一个业务域（如订单），从 ODS 建到 ADS 四层，全部跑通",
+        "sun": "写建模文档：粒度、口径定义、更新策略、上下游依赖、负责人"
+      }
+    },
+    {
+      "week": 14,
+      "phase": "D 调度与工程化",
+      "title": "Airflow：DAG、依赖与可靠性",
+      "goal": "从「脚本」到「被调度系统管理的任务」。",
+      "materials": [
+        {
+          "name": "Airflow 官方教程",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/tutorial/index.html"
+        },
+        {
+          "name": "Airflow 最佳实践",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html"
+        }
+      ],
+      "weekday": [
+        "DAG / Task / Operator / Sensor 概念，以及与 cron 的本质区别",
+        "调度语义：execution_date、data interval、catchup，这是最容易搞错的地方",
+        "依赖与触发：TriggerDagRunOperator、ExternalTaskSensor、Dataset 驱动",
+        "重试策略：retries / retry_delay / exponential backoff，什么错误不该重试",
+        "SLA 与告警：sla_miss_callback、on_failure_callback 怎么配"
+      ],
+      "weekend": {
+        "sat": "实战：把 MySQL→Iceberg→Doris 链路改成 Airflow 编排，3 个 DAG 串起来",
+        "sun": "故意造一次失败：停掉下游依赖，看告警是否到达，验证重试行为"
+      }
+    },
+    {
+      "week": 15,
+      "phase": "D 调度与工程化",
+      "title": "补数、并发控制与 dbt 入门",
+      "goal": "补数是数据平台的高频刚需，也是最容易出错的地方。",
+      "materials": [
+        {
+          "name": "dbt 官方免费课程 Fundamentals",
+          "url": "https://learn.getdbt.com/"
+        },
+        {
+          "name": "dbt 文档",
+          "url": "https://docs.getdbt.com/docs/introduction"
+        }
+      ],
+      "weekday": [
+        "补数设计：幂等（可重复跑）是前提，分区覆盖是手段",
+        "并发控制：pool / queue / max_active_runs，防止把集群打爆",
+        "dbt 是什么：把 SQL 当代码管理，ref() 自动解析依赖",
+        "dbt 三种物化：view / table / incremental，各自成本",
+        "dbt 项目结构：models / sources / tests / docs 目录约定"
+      ],
+      "weekend": {
+        "sat": "实战：用 dbt 重写你的 DWD/DWS 层，用 dbt run 一条命令跑通全链路",
+        "sun": "实战：一键补跑过去 7 天数据，验证重跑两次结果一致（幂等验收）"
+      }
+    },
+    {
+      "week": 16,
+      "phase": "D 调度与工程化",
+      "title": "dbt 进阶与研发规范",
+      "goal": "让代码可维护、可评审、可交接，这是团队和个人的分水岭。",
+      "materials": [
+        {
+          "name": "dbt 测试",
+          "url": "https://docs.getdbt.com/docs/build/tests"
+        },
+        {
+          "name": "dbt 增量模型",
+          "url": "https://docs.getdbt.com/docs/build/incremental-models"
+        }
+      ],
+      "weekday": [
+        "增量模型：is_incremental()、unique_key、on_schema_change 三个坑",
+        "数据测试：not_null / unique / relationships / accepted_values，以及自定义测试",
+        "生成文档 + 血缘图：dbt docs generate 能自动画出依赖关系",
+        "环境隔离：dev / test / prod 的 target 配置与 profile 管理",
+        "研发规范：命名、分层边界、任务 owner、代码评审、上线灰度"
+      ],
+      "weekend": {
+        "sat": "实战：给关键表补 5 个测试，跑 dbt test 并让一个测试故意失败看告警",
+        "sun": "写一份你自己的《数据开发规范》v1（命名/分层/上线/告警四项）"
+      }
+    },
+    {
+      "week": 17,
+      "phase": "E 数据治理",
+      "title": "数据质量体系",
+      "goal": "从「能做需求」到「能保证数据可信」，这是平台开发者的分水岭。",
+      "materials": [
+        {
+          "name": "Great Expectations 文档",
+          "url": "https://docs.greatexpectations.io/docs/"
+        },
+        {
+          "name": "数据质量维度综述",
+          "url": "https://www.dataversity.net/what-is-data-quality/"
+        }
+      ],
+      "weekday": [
+        "五类质量规则：完整性、唯一性、及时性、有效性、一致性，各举例",
+        "规则怎么落地：SQL 断言 vs 框架（GE/Deequ）的取舍",
+        "及时性监控：基线（baseline）与破线预警怎么做",
+        "质量分的计算与展示：如何让业务方真的看",
+        "坏数据的止损：阻断下游 vs 打标放行，怎么选"
+      ],
+      "weekend": {
+        "sat": "实战：给 ADS 表写 5 条质量规则，接入 Airflow，失败自动告警到飞书",
+        "sun": "设计一份质量报告模板：覆盖率、通过率、Top 问题表、趋势"
+      }
+    },
+    {
+      "week": 18,
+      "phase": "E 数据治理",
+      "title": "元数据管理",
+      "goal": "平台的价值之一是「让人找得到数据」，元数据是底座。",
+      "materials": [
+        {
+          "name": "DataHub 文档",
+          "url": "https://docs.datahub.com/docs/"
+        },
+        {
+          "name": "OpenMetadata 文档",
+          "url": "https://docs.open-metadata.org/"
+        }
+      ],
+      "weekday": [
+        "三类元数据：技术元数据、业务元数据、操作元数据",
+        "采集方式：JDBC 拉取、Hive Metastore 同步、API 推送，各自覆盖什么",
+        "业务元数据为什么难：owner 是谁、口径谁定、标签谁打",
+        "数据地图的核心体验：搜索、打标、热度、相似推荐",
+        "元数据与血缘、质量、权限的关系（它是枢纽，不是孤岛）"
+      ],
+      "weekend": {
+        "sat": "实战：docker 起 DataHub，把 Doris 和 Iceberg 的库表采集进去，能看到表和字段",
+        "sun": "给核心表补 owner、业务描述、标签，验证搜索能找到"
+      }
+    },
+    {
+      "week": 19,
+      "phase": "E 数据治理",
+      "title": "数据血缘",
+      "goal": "血缘是故障影响分析、变更评估、成本归因的共同基础。",
+      "materials": [
+        {
+          "name": "DataHub 血缘 API",
+          "url": "https://docs.datahub.com/docs/api/tutorial-lineage"
+        },
+        {
+          "name": "sqlglot（SQL 解析）",
+          "url": "https://github.com/tobymao/sqlglot"
+        }
+      ],
+      "weekday": [
+        "表级血缘 vs 列级血缘，为什么列级难（子查询、CTE、UDF、动态 SQL）",
+        "两种采集路径：SQL 解析（静态）vs 运行时（hook / 日志）",
+        "血缘的四种用法：影响分析、变更评估、根因定位、成本归因",
+        "血缘不准怎么办：置信度标注、人工校准、灰度上线",
+        "与调度打通：DAG 依赖 ≠ 数据血缘，为什么要两个都有"
+      ],
+      "weekend": {
+        "sat": "实战：用 sqlglot 解析你的 dbt 模型，生成表级血缘并画成图",
+        "sun": "做一个影响分析 demo：指定一张表，列出所有下游表与报表"
+      }
+    },
+    {
+      "week": 20,
+      "phase": "E 数据治理",
+      "title": "权限、安全与成本治理",
+      "goal": "这两件事直接决定平台能不能在公司里长期活下去。",
+      "materials": [
+        {
+          "name": "Doris 权限模型",
+          "url": "https://doris.apache.org/docs/admin-manual/auth/overview"
+        },
+        {
+          "name": "数据安全国标（TC260）",
+          "url": "https://www.tc260.org.cn/"
+        }
+      ],
+      "weekday": [
+        "RBAC：库/表/列级权限，行级权限（Row Policy）怎么配",
+        "脱敏策略：静态脱敏 vs 动态脱敏，各自代价",
+        "审计日志：谁在什么时候查了什么，怎么留、留多久",
+        "数据分级分类：公开/内部/敏感/机密，与个人信息保护法的对应",
+        "成本治理：存储生命周期、冷热分层、任务资源画像、浪费识别"
+      ],
+      "weekend": {
+        "sat": "实战：给 Doris 建两个角色，验证行级权限与列级脱敏生效",
+        "sun": "做一次成本盘点：列出环境里最贵的 3 个任务，给出优化方案"
+      }
+    },
+    {
+      "week": 21,
+      "phase": "F 实时与平台化",
+      "title": "Flink 核心：事件时间与状态",
+      "goal": "流计算的心智模型和批完全不同，先把时间语义搞对。",
+      "materials": [
+        {
+          "name": "Flink 概念总览",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/overview/"
+        },
+        {
+          "name": "Streaming Systems（书）",
+          "url": "https://www.oreilly.com/library/view/streaming-systems/9781491983867/"
+        }
+      ],
+      "weekday": [
+        "事件时间 vs 处理时间 vs 摄入时间，为什么只有事件时间能保证结果正确",
+        "watermark 的本质：对「不会再有更早数据」的假设，迟到数据怎么处理",
+        "窗口：滚动 / 滑动 / 会话 / 累积，各自适用场景",
+        "状态：keyed state vs operator state，状态大小怎么估算",
+        "状态后端：HashMapStateBackend vs RocksDB，什么时候必须用 RocksDB"
+      ],
+      "weekend": {
+        "sat": "实战：Kafka → Flink SQL 做 5 分钟滚动窗口聚合，写入 Doris",
+        "sun": "实验：注入迟到数据，观察 watermark 之后的数据是被丢弃还是被更新"
+      }
+    },
+    {
+      "week": 22,
+      "phase": "F 实时与平台化",
+      "title": "Checkpoint、反压与 Exactly-Once",
+      "goal": "实时任务的稳定性，80% 取决于这三件事。",
+      "materials": [
+        {
+          "name": "Flink Checkpointing",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/checkpoints/"
+        },
+        {
+          "name": "Flink Kafka 连接器容错（两阶段提交）",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/#fault-tolerance"
+        }
+      ],
+      "weekday": [
+        "checkpoint 机制：barrier 对齐、状态快照、恢复时从哪个位点重放",
+        "反压（backpressure）的成因与定位：看哪些指标、怎么判断卡在哪一环",
+        "端到端 exactly-once：两阶段提交 + 幂等 sink 的组合，缺一不可",
+        "savepoint 与 checkpoint 的区别：升级作业时用哪个",
+        "常见稳定性问题：状态膨胀、checkpoint 超时、GC 长暂停"
+      ],
+      "weekend": {
+        "sat": "实战：kill 掉 Flink 作业再恢复，验证下游不重不漏（用主键统计对比）",
+        "sun": "实战：人为造反压（下游变慢），用 Flink UI 定位到具体算子"
+      }
+    },
+    {
+      "week": 23,
+      "phase": "F 实时与平台化",
+      "title": "实时数仓分层与维表 Join",
+      "goal": "把实时链路做成和离线一样有分层、有规范的东西。",
+      "materials": [
+        {
+          "name": "Flink SQL Joins（含 lookup join）",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/table/sql/queries/joins/"
+        },
+        {
+          "name": "Apache Paimon（流批一体存储）",
+          "url": "https://paimon.apache.org/docs/master/"
+        }
+      ],
+      "weekday": [
+        "实时分层：ODS(Kafka) → DWD → DWS，每层存哪、怎么保证顺序",
+        "维表 join 三种方式：lookup（每行查库）、广播（全量进内存）、预加载+TTL",
+        "维表变更怎么处理：CDC 维表 + 状态更新 vs 定时刷新",
+        "Lambda vs Kappa：为什么很多公司最终选了「流批分离但统一存储」",
+        "实时指标的口径与离线对齐：对不上的时候怎么查"
+      ],
+      "weekend": {
+        "sat": "实战：把订单 CDC 流做成 DWD 明细 + DWS 分钟级汇总，写入 Doris 供 BI 查",
+        "sun": "对比同一指标的实时值与离线值，找出差异原因"
+      }
+    },
+    {
+      "week": 24,
+      "phase": "F 实时与平台化",
+      "title": "Capstone 收尾与能力盘点",
+      "goal": "把 24 周的东西收成一条能讲 30 分钟的完整链路。",
+      "materials": [
+        {
+          "name": "Trino 文档",
+          "url": "https://trino.io/docs/current/"
+        },
+        {
+          "name": "Superset 文档",
+          "url": "https://superset.apache.org/docs/introduction"
+        }
+      ],
+      "weekday": [
+        "补齐链路：Trino 查 Iceberg + Superset 出 2 张图",
+        "监控：Prometheus + Grafana 监控任务耗时与 Kafka lag",
+        "画架构图：把 MySQL→Kafka→Flink→Iceberg→Doris→BI 全链路画清楚",
+        "写 README：每个组件的作用、端口、启动方式、踩过的坑",
+        "准备讲述：3 分钟版 / 10 分钟版 / 30 分钟版各练一遍"
+      ],
+      "weekend": {
+        "sat": "完整演练：从零启动环境 → 跑通全链路 → 演示补数 → 演示故障恢复",
+        "sun": "能力盘点：对照 24 周清单自评（掌握/会用/听过），列出下一个 3 个月的补强计划"
+      }
+    }
+  ]
+}

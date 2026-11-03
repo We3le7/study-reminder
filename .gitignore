@@ -1,0 +1,8 @@
+# 缓存与本地文件
+__pycache__/
+*.pyc
+.DS_Store
+
+# 绝对不要提交 Webhook 地址（它等同于密码）
+.env
+webhook.txt
